@@ -28,7 +28,7 @@ pid_t child [2];
 
 
 /* Make the output file */
-    if((outFile = open("outfile",O_RDWR, O_CREAT | O_TRUNC)) < 0) {
+    if((outFile = open("outfile",O_RDWR |  O_CREAT | O_TRUNC)) < 0) {
         perror("can't open outfile");
         exit(-1);
     }
