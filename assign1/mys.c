@@ -1,7 +1,7 @@
 #include<stdio.h>
+#include<stdlib.h>
 #include<fcntl.h>
 #include<sys/stat.h>
-#include<stdlib.h>
 #include<termios.h>
 #include<unistd.h>
 #include<sys/types.h>
@@ -15,10 +15,11 @@ static void get_winsize(int fd, struct winsize *ws);
 static void set_winsize(int fd, struct winsize *ws);
 void restore_mode(int fd, struct termios *old);
 void raw_mode(int fd, struct termios *old);
+void printId();
 
 
 int main (int argc,char * argv[]) {
-    pid_t id, input, slave;
+    pid_t input, slave, slaveId;
     int outfile, pty;
     char inData [BUF_SIZE];
     char outData [BUF_SIZE];
@@ -37,8 +38,7 @@ int main (int argc,char * argv[]) {
     }
 
     /*Print pid incase I need to terminate it manually */
-    id = getpid();
-    fprintf(stderr, "Parent process id is %d\n",id);
+    printId();
 
     /*make sure you are in a tty */
     if(isatty(STDIN_FILENO) != 1){
@@ -50,18 +50,24 @@ int main (int argc,char * argv[]) {
     raw_mode(STDIN_FILENO, &original);
 
     /*opens the pty and sets flags */
-    if((pty = posix_openpt(O_RDWR | O_NOCTTY)) == -1) {
+    pty = posix_openpt(O_RDWR | O_NOCTTY);
+    if(pty == -1) {
         perror("No pty");
         exit(-1);
     }
     
     /*do slave stuff */
     if(!(slave = fork())){
+        /*Print pid incase I need to terminate it manually */
+        printId();
+
+        slaveId = setsid();
 
         exit(1);
     }
     /*do input stuff */
     if(!(input = fork())){
+        printId();
         /*set up sig handler*/
         
         while(read(STDIN_FILENO, inData, BUF_SIZE) > 0) {
@@ -141,3 +147,7 @@ static void set_winsize(int fd, struct winsize *ws) {
       }
 }
 
+void printId() {
+    /*Print pid incase I need to terminate it manually */
+    fprintf(stderr, "Parent process id is %d\n",getpid()); 
+}
