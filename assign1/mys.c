@@ -1,4 +1,6 @@
 #include<stdio.h>
+#include<fcntl.h>
+#include<sys/stat.h>
 #include<stdlib.h>
 #include<termios.h>
 #include<unistd.h>
@@ -16,8 +18,9 @@ int main (int argc,char * argv[]) {
     pid_t id;
     int outfile;
     struct winsize win;
+    struct termios original;
     
-    if(argc != 1 || argc != 2) {
+    if(argc != 1 && argc != 2) {
         perror("Please enter correct # of arguments\n");
         exit(-1);
     }
@@ -28,6 +31,13 @@ int main (int argc,char * argv[]) {
     }
     id = getpid();
     fprintf(stderr, "Parent process id is %d\n",id);
+
+    if(isatty(0) != 1){
+        perror("Not a tty\n");
+        exit(-1);
+    }
+    get_winsize(0,&win);
+    raw_mode(0, &original);
 
 
     return 0;

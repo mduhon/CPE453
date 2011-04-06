@@ -4,9 +4,9 @@ CFLAGS = -Wall -g
 
 LDFLAGS =
 
-TARGET = pipeit
+TARGET = mys
 
-SRC = pipeit.c 
+SRC = mys.c 
 
 HEADERS =  
 
@@ -19,7 +19,7 @@ allclean: clean
 clean:
 	rm -f $(TARGET) 
 
-$(TARGET): pipeit.c 
+$(TARGET): mys.c 
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $(TARGET) $(SRC)
 
 			   
@@ -29,4 +29,4 @@ depend:
 tags: $(SRC) $(HEADERS)
 	cscope -b $(SRC) $(HEADERS)
 test:
-	./$(TARGET) test1.test
+	./$(TARGET) test
