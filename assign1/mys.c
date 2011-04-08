@@ -22,8 +22,8 @@ void restore_mode(int fd, struct termios *old);
 void raw_mode(int fd, struct termios *old);
 void printId(int where);
 
-pid_t inputId, slaveId;
 
+void closer (int signum);
 
 int main (int argc,char * argv[]) {
     pid_t input, slave;
@@ -34,7 +34,7 @@ int main (int argc,char * argv[]) {
     char *shell;
     struct winsize win;
     struct termios original;
-    struct sigaction new, old;
+    struct sigaction sa;
     struct passwd *pass;
     
     /*Opens the correct output file depending on the request */
@@ -69,12 +69,19 @@ int main (int argc,char * argv[]) {
         perror("No pty");
         exit(-1);
     }
-    
+ void closer(int signum) {
+    close(pty);
+    close(outfile);
+    exit(1);
+}
+    sa.sa_flags = 0;
+    sa.sa_handler = closer;
+    sigemptyset(&sa.sa_mask);   
     /*do slave stuff */
     if(!(slave = fork())){
         /*Print pid incase I need to terminate it manually */
         printId(2);
-        slaveId = setsid();
+        setsid();
         if( grantpt(pty) == -1 || unlockpt(pty) == -1){
             perror("can't get slave end");
             exit(-1);
@@ -119,15 +126,15 @@ int main (int argc,char * argv[]) {
         exit(1);
     }
     /*do input stuff */
-    if(!(input = fork())){
+    else if(!(input = fork())){
         /*set up sig handler*/
-        if(sigaction(SIGTERM,&new,&old )) {
-            close(pty);
-            close(outfile);
-            exit(1);
-        }
+
+    
+       if(-1 == sigaction(SIGTERM,&sa, NULL )) {
+           perror("sigaction");
+           exit(-2);
+       }
         printId(3);
-        inputId = getpid();
         
         while((toPrint = read(STDIN_FILENO, inData, BUF_SIZE)) > 0) {
             write(pty, inData, toPrint);
@@ -141,26 +148,22 @@ int main (int argc,char * argv[]) {
         write(STDOUT_FILENO, outData, toPrint);
     }
     /*send signal to input*/
+    kill(input,SIGTERM);
 
-    kill(inputId,SIGTERM);
-    waitpid(inputId, &status, 0);
-    waitpid(slaveId, &status, 0);
-    /* wait for slave *//*
-    if ( -1 == wait(NULL) ) { 
-
-        perror("wait");
-    }*/
-    /* wait for input *//*
-    if ( -1 == wait(NULL) ) { 
-
-        perror("wait");
-    }*/
+    /* wait for input */
+    if (-1 == waitpid(input, &status, 0)){
+        perror("wait input");
+    } 
+    /* wait for slave */
+    if (-1 == waitpid(slave, &status, 0)){
+        perror("wait slave");
+    }
 
     /* clean up stuff */
-    restore_mode(STDIN_FILENO, &original);
-    set_winsize(STDIN_FILENO,&win);
     close(pty);
     close(outfile);
+    restore_mode(STDIN_FILENO, &original);
+    set_winsize(STDIN_FILENO,&win);
     printf("Script finished on %s\n", asctime(localtime(&time)));
     fflush(stdout);
 
@@ -228,3 +231,5 @@ void printId(int where) {
             break;
     }
 }
+
+
