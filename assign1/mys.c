@@ -1,3 +1,8 @@
+/* Mathew Duhon
+ * CPE-453
+ * Nico
+ * assign 1 mys
+ */
 #define _XOPEN_SOURCE 600
 
 #include<stdio.h>
@@ -52,7 +57,7 @@ int main (int argc,char * argv[]) {
     fflush(stdout);
 
     /*Print pid incase I need to terminate it manually */
-    printId(1);
+//    printId(1);
 
     /*make sure you are in a tty */
     if(isatty(STDIN_FILENO) != 1){
@@ -69,24 +74,29 @@ int main (int argc,char * argv[]) {
         perror("No pty");
         exit(-1);
     }
- void closer(int signum) {
-    close(pty);
-    close(outfile);
-    exit(1);
-}
+ 
+    /*Set up handler*/
     sa.sa_flags = 0;
     sa.sa_handler = closer;
     sigemptyset(&sa.sa_mask);   
     /*do slave stuff */
     if(!(slave = fork())){
         /*Print pid incase I need to terminate it manually */
-        printId(2);
-        setsid();
+ //       printId(2);
+        if((setsid()) == -1) {
+            perror("setsid");
+            exit(-1);
+        }
+        /* allow pty slave access and then open it*/
         if( grantpt(pty) == -1 || unlockpt(pty) == -1){
             perror("can't get slave end");
             exit(-1);
         }
-        slavePty = open(ptsname(pty), O_RDWR);
+        if((slavePty = open(ptsname(pty), O_RDWR)) < 0) {
+            perror("can't open pty");
+            exit(-2);
+        }
+        /*check to make sure it worked to open slave pty*/
         if(isatty(slavePty) != 1) { 
             perror("slave open");
             exit(-2);
@@ -94,6 +104,7 @@ int main (int argc,char * argv[]) {
         restore_mode(slavePty, &original);
         set_winsize(slavePty,&win);
 
+        /*dup all stuff for slave end*/
         if(-1 == dup2(slavePty, STDOUT_FILENO)) {
             perror("dup2:0");
             exit(-1);
@@ -107,9 +118,11 @@ int main (int argc,char * argv[]) {
             exit(-1);
         }
         
+        /*close all fd*/
         close(outfile);
         close(pty);
         close(slavePty);
+        /*check for current shell and if not there find favorite shell*/
         shell = getenv("SHELL");
         if(shell == NULL || *shell == '\0') {
             pass = malloc(sizeof(*pass));
@@ -120,6 +133,7 @@ int main (int argc,char * argv[]) {
             pass = getpwuid(getuid());
             shell = pass->pw_shell;
         }
+        /* start new shell*/
         execlp(shell,shell, NULL);
         perror("Execl didn't work");
 
@@ -127,15 +141,15 @@ int main (int argc,char * argv[]) {
     }
     /*do input stuff */
     else if(!(input = fork())){
-        /*set up sig handler*/
 
-    
+
+       /*set up sig handler*/
        if(-1 == sigaction(SIGTERM,&sa, NULL )) {
            perror("sigaction");
            exit(-2);
        }
-        printId(3);
-        
+//        printId(3);
+       /*copy stuff to the master end of pty*/ 
         while((toPrint = read(STDIN_FILENO, inData, BUF_SIZE)) > 0) {
             write(pty, inData, toPrint);
           }
@@ -232,4 +246,6 @@ void printId(int where) {
     }
 }
 
-
+void closer(int signum) {
+    exit(1);
+}
